@@ -1,0 +1,111 @@
+参考的博客 ：
+https://www.cnblogs.com/aspirant/p/6920418.html
+# 线程池的好处
+1.可以控制线程的数量
+2.首先呢服务器执行一个任务呢需要三步，第一创建线程、第二在线程中执行任务、第三销毁线程。而线程池所做的事情就是缩短了第一步和第二步的时间。事先就创建好了一部分线程，并且可以循环利用这些线程。
+3.同时也提高了效率
+# 线程池的实现过程
+实现运行线程的数量小于corePoolSize的时候，线程池优先采用新建线程来解决。当大于corepoolsize的时候，这个时候会将任务加入队列中等候。当队列满的时候，这个时候线程池又会开始使用新建线程来解决，知道超过maximumpoolsize的时候。已经无法处理任务的时候，开始执行拒绝策略。
+# 常见的线程池
+最顶部的接口是java.util.concurrent里的Executor接口。
+![在这里插入图片描述](https://img-blog.csdnimg.cn/20181125124646843.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM2MTYwMDU3,size_16,color_FFFFFF,t_70)
+
+**newSingleThreadPool ( )**
+
+```
+public static ExecutorService newSingleThreadExecutor() {   
+            return new FinalizableDelegatedExecutorService   
+                 (new ThreadPoolExecutor(1, 1,   
+                                       0L, TimeUnit.MILLISECONDS,   
+                                      new LinkedBlockingQueue<Runnable>()));   
+       }
+```
+**newFixedThreadPool ( )**
+为什么这里corePoolsize和maximumpoolsize是相同的？这是因为他的队列是无界的，当队列是无界的时候maximumpoolsize是没有意义的。keepAliveTime和unit的设值表名什么？------该实现不想keep alive！
+```
+public static ExecutorService newFixedThreadPool(int nThreads) {   
+
+           return new ThreadPoolExecutor(nThreads, nThreads,   
+
+                                        0L, TimeUnit.MILLISECONDS,   
+
+                                        new LinkedBlockingQueue<Runnable>());   
+
+      }
+```
+**newCachedThreadPool( )**
+看函数，这个首先呢线程池是无界的了。其次呢这里在队列的选择上使用了synchronousQueue<Runnable>，这意味着每个插入操作必须等待另一个线程的移除操作。
+```
+public static ExecutorService newCachedThreadPool() {   
+             return new ThreadPoolExecutor(0, Integer.MAX_VALUE,   
+                                         60L, TimeUnit.SECONDS,   
+                                        new SynchronousQueue<Runnable>());   
+    }
+```
+
+# 线程池排队的策略
+排队有三种通用策略
+**直接提交**
+工作队列的默认选项是 SynchronousQueue,
+**无界队列**
+
+**有界队列**
+
+
+# 线程池的拒绝策略
+### RejectedExecutionHandler
+换个方法来说。就是老板就算借了工人过来但是任务还是一直来人手又不够了，但是已经没办法继续借工人了。这个时候呢就要考虑拒绝任务了
+### 策略1：
+**CallerRunsPolicy：线程调用运行该任务的 execute 本身。此策略提供简单的反馈控制机制，能够减缓新任务的提交速度**
+就这个策略来说并不想放弃执行任务，然后就让executor本身来执行任务
+
+```
+public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+
+           if (!e.isShutdown()) {
+
+               r.run();
+
+           }
+
+       }
+```
+
+### 策略2：
+**abortPolicy:处理程序遭到拒绝将抛出运行RejectedExecutionException**
+也就是丢弃任务，并且抛出一个异常
+
+```
+public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+
+           throw new RejectedExecutionException();
+
+       }
+```
+
+### 策略3：
+**discardPolicy:不能处理的任务将直接被删除**
+这个策略和策略2一样也是丢弃任务，但是并不抛出异常
+
+```
+public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+
+       }
+```
+
+### 策略4：
+**discardOldestPolicy:如果执行程序尚未关闭，则位于工作队列头部的任务将被删除，然后重试执行程序（如果再次失败，则重复此过程）**
+
+```
+public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+
+           if (!e.isShutdown()) {
+
+               e.getQueue().poll();
+
+               e.execute(r);
+
+           }
+
+       }
+```
